@@ -7,54 +7,48 @@ import org.neo4j.graphdb.factory.GraphDatabaseFactory
 import org.neo4j.kernel.impl.util.StringLogger
 
 import scala.collection.mutable
-import scala.collection.par._
-import scala.collection.par.Scheduler.Implicits.global
 
-import spray.json._
-import DefaultJsonProtocol._
-
-
-/**
- * Created by dav009 on 15/09/2014.
- */
 class Idiontology(val pathToDB: String) {
 
+  // idiontology
   val  db:GraphDatabaseService = new GraphDatabaseFactory().newEmbeddedDatabase( pathToDB )
+
+  // node index
   val autoIndex = db.index().getNodeAutoIndexer.getAutoIndex
+
+  // allows cypher execution
   val engine:ExecutionEngine = new ExecutionEngine( db, StringLogger.SYSTEM );
 
-
-
-  db
-
+  // returns the name of a Node
   def getName(mid:String): String ={
     try {
       val typeNode: Node = autoIndex.get("mid", mid).getSingle
        typeNode.getProperty("name").toString
     }catch{
-
-
       case e:Exception => {
 
         e.printStackTrace()
         ""
       }
     }
-
-
   }
 
+  /*
+  * Returns a node Given an mid
+  */
   def getNode(mid:String):Node={
       autoIndex.get("mid", mid).getSingle()
-
   }
 
-
+  /*
+  * Gather all the type_rels from idiontology
+  * and dumps them in the specified path
+  * */
   def getTypeRels(pathToOutputFile: String): Unit ={
 
-    // write them to file
     val writer = new PrintWriter(new File(pathToOutputFile))
 
+    // cypher query to get all types and subtypes
     val cypherQuery :String =
       """
         START root=node:node_auto_index(mid="/m/idiothing")
@@ -66,11 +60,11 @@ class Idiontology(val pathToDB: String) {
         return fb_sub_type.mid as type_id, t_node.mid as topic_mid, t_node.dbpedia_id as topic_dbpedia, ID(x) as rel_id
 
       """
+
     val tx:Transaction = db.beginTx();
     try{
+
       val result : ExecutionResult= engine.execute(cypherQuery );
-
-
 
       result.foreach{
         row: Map[String, Any] =>
@@ -89,13 +83,18 @@ class Idiontology(val pathToDB: String) {
       tx.finish()
     }
 
-
     writer.close()
   }
 
+
+
+  /*
+  * Given a list with tuples (RelationshipsIds, weight)..
+  * it sets for every relationship the given weight as a property.
+  * */
   def setWeights(weights:mutable.ArraySeq[(String, Double)]): Unit = {
 
-    println("inserting into neo4j...")
+    println("inserting weights into neo4j...")
 
     var counter = 0
 
@@ -116,13 +115,7 @@ class Idiontology(val pathToDB: String) {
             tx.finish()
           }
       }
-
-
-
-
   }
-
-
 }
 
 
@@ -193,7 +186,7 @@ object LoadRelationshipsWeights{
            val weight = splitLine(0).toDouble
            val topicMid = splitLine(1)
            val typeMid = splitLine(3)
-           val relId = splitLine(4)
+           val relId = splitLine(5)
 
          (relId, weight)
     }
